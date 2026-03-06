@@ -3,23 +3,21 @@ FROM alpine:latest AS builder
 ARG TARGETARCH
 
 # CentOS 7 已停止维护(2024-06 EOL)，直接在 Alpine 中下载 v2ray 二进制文件
-RUN apk add --no-cache curl unzip \
+# 使用 releases/latest/download 直链，无需查询 GitHub API，避免 CI 中被限流
+RUN set -ex \
+    && apk add --no-cache curl unzip \
     && case "${TARGETARCH}" in \
         amd64) ARCH="64" ;; \
         arm64) ARCH="arm64-v8a" ;; \
         386)   ARCH="32" ;; \
-        *)     echo "Unsupported arch: ${TARGETARCH}" && exit 1 ;; \
+        *)     echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
        esac \
-    && LATEST=$(curl -sL "https://api.github.com/repos/v2fly/v2ray-core/releases/latest" \
-         -H "Accept: application/json" -H "User-Agent: Mozilla/5.0" \
-         | grep '"tag_name"' | cut -d'"' -f4) \
-    && [ -n "${LATEST}" ] || { echo "Failed to fetch latest v2ray version"; exit 1; } \
-    && echo "Downloading v2ray ${LATEST} for linux-${ARCH}" \
-    && curl -L -o /tmp/v2ray.zip \
-         "https://github.com/v2fly/v2ray-core/releases/download/${LATEST}/v2ray-linux-${ARCH}.zip" \
+    && curl -fL --retry 3 --retry-delay 5 -o /tmp/v2ray.zip \
+         "https://github.com/v2fly/v2ray-core/releases/latest/download/v2ray-linux-${ARCH}.zip" \
     && mkdir -p /usr/bin/v2ray \
     && unzip -oj /tmp/v2ray.zip -d /usr/bin/v2ray \
-    && chmod +x /usr/bin/v2ray/v2ray
+    && chmod +x /usr/bin/v2ray/v2ray \
+    && rm -f /tmp/v2ray.zip
 
 FROM alpine:latest
 

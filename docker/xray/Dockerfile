@@ -3,23 +3,21 @@ FROM alpine:latest AS builder
 ARG TARGETARCH
 
 # CentOS 7 已停止维护(2024-06 EOL)，直接在 Alpine 中下载 xray 二进制文件
-RUN apk add --no-cache curl unzip \
+# 使用 releases/latest/download 直链，无需查询 GitHub API，避免 CI 中被限流
+RUN set -ex \
+    && apk add --no-cache curl unzip \
     && case "${TARGETARCH}" in \
         amd64) ARCH="64" ;; \
         arm64) ARCH="arm64-v8a" ;; \
         386)   ARCH="32" ;; \
-        *)     echo "Unsupported arch: ${TARGETARCH}" && exit 1 ;; \
+        *)     echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
        esac \
-    && LATEST=$(curl -sL "https://api.github.com/repos/XTLS/Xray-core/releases/latest" \
-         -H "Accept: application/json" -H "User-Agent: Mozilla/5.0" \
-         | grep '"tag_name"' | cut -d'"' -f4) \
-    && [ -n "${LATEST}" ] || { echo "Failed to fetch latest xray version"; exit 1; } \
-    && echo "Downloading xray ${LATEST} for linux-${ARCH}" \
-    && curl -L -o /tmp/xray.zip \
-         "https://github.com/XTLS/Xray-core/releases/download/${LATEST}/Xray-linux-${ARCH}.zip" \
+    && curl -fL --retry 3 --retry-delay 5 -o /tmp/xray.zip \
+         "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-${ARCH}.zip" \
     && mkdir -p /usr/bin/xray \
     && unzip -oj /tmp/xray.zip -d /usr/bin/xray \
-    && chmod +x /usr/bin/xray/xray
+    && chmod +x /usr/bin/xray/xray \
+    && rm -f /tmp/xray.zip
 
 FROM alpine:latest
 
