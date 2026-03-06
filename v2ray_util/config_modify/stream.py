@@ -40,6 +40,7 @@ class StreamModifier:
             (StreamType.VLESS_WS, "VLESS_WS"),
             (StreamType.VLESS_REALITY, "VLESS_REALITY"),
             (StreamType.VLESS_GRPC, "VLESS_GRPC"),
+            (StreamType.VLESS_REALITY_GRPC, "VLESS_REALITY_GRPC"),
             (StreamType.TROJAN, "Trojan"),
         ]
         self.group_tag = group_tag
@@ -75,7 +76,7 @@ class StreamModifier:
             print("")
             header = CommonSelector(header_type_list(), _("please select fake header: ")).select()
             kw = {'security': security, 'key': key, 'header': header}
-        elif sType in (StreamType.VLESS_TLS, StreamType.VLESS_WS, StreamType.VLESS_REALITY, StreamType.VLESS_GRPC):
+        elif sType in (StreamType.VLESS_TLS, StreamType.VLESS_WS, StreamType.VLESS_REALITY, StreamType.VLESS_GRPC, StreamType.VLESS_REALITY_GRPC):
             port_set = all_port()
             if not "443" in port_set and sType == StreamType.VLESS_TLS:
                 print()
@@ -92,6 +93,18 @@ class StreamModifier:
                 serverName = input(_("please input reality serverName(domain): "))
                 kw = {'flow': xtls_flow()[0]}
                 kw['serverNames'] = [serverName]
+            elif sType == StreamType.VLESS_REALITY_GRPC:
+                # Reality gRPC 不支持 xtls-rprx-vision flow
+                serverName = input(_("please input reality serverName(domain): "))
+                kw['serverNames'] = [serverName]
+                serviceName = input(_("please input grpc serviceName(default grpc): "))
+                if not serviceName:
+                    serviceName = "grpc"
+                kw['serviceName'] = serviceName
+                if run_type == "xray":
+                    choice = readchar(_("open xray grpc multiMode?(y/n): ")).lower()
+                    if choice == 'y':
+                        kw['mode'] = 'multi'
             elif sType == StreamType.VLESS_GRPC and run_type == "xray":
                 choice = readchar(_("open xray grpc multiMode?(y/n): ")).lower()
                 if choice == 'y':

@@ -146,7 +146,10 @@ Network: {network}
             if self.flow:
                 result_link += "&flow={}".format(self.flow)
         elif tls == "reality":
-            result_link += "&security=reality&fp=chrome&flow={}&sni={}&pbk={}&sid={}".format(self.flow, self.serverName, x25519_key(self.privateKey)[1], self.shortId)
+            result_link += "&security=reality&fp=chrome&sni={}&pbk={}&sid={}".format(self.serverName, x25519_key(self.privateKey)[1], self.shortId)
+            # gRPC 传输层不支持 xtls-rprx-vision flow，仅 tcp 需要
+            if self.flow:
+                result_link += "&flow={}".format(self.flow)
         if self.network == "ws":
             result_link += "&type=ws&host={0}&path={1}".format(self.host, quote(self.path))
         elif self.network == "tcp":

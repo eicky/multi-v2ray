@@ -79,6 +79,7 @@ class StreamType(Enum):
     VLESS_WS = 'vless_ws'
     VLESS_GRPC = 'vless_grpc'
     VLESS_REALITY = 'vless_reality'
+    VLESS_REALITY_GRPC = 'vless_reality_grpc'
     TROJAN = 'trojan'
 
 def header_type_list():

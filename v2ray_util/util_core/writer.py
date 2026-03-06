@@ -135,7 +135,10 @@ class StreamWriter(Writer):
         elif self.part_json['protocol'] == 'socks':
             origin_protocol = StreamType.SOCKS
         elif self.part_json['protocol'] == 'vless':
-            if self.part_json["streamSettings"]["network"] == "grpc":
+            # grpc+reality 组合检测需优先于单独 grpc/reality 检测
+            if self.part_json["streamSettings"]["network"] == "grpc" and self.part_json["streamSettings"]["security"] == "reality":
+                origin_protocol = StreamType.VLESS_REALITY_GRPC
+            elif self.part_json["streamSettings"]["network"] == "grpc":
                 origin_protocol = StreamType.VLESS_GRPC
             elif self.part_json["streamSettings"]["security"] == "reality":
                 origin_protocol = StreamType.VLESS_REALITY
@@ -148,7 +151,7 @@ class StreamWriter(Writer):
 
         if origin_protocol not in no_tls_group:
             security_backup = self.part_json["streamSettings"]["security"]
-            if origin_protocol == StreamType.VLESS_REALITY:
+            if origin_protocol in (StreamType.VLESS_REALITY, StreamType.VLESS_REALITY_GRPC):
                 tls_settings_backup = self.part_json["streamSettings"]["realitySettings"]
             else:
                 tls_settings_backup = self.part_json["streamSettings"]["tlsSettings"]
@@ -242,7 +245,8 @@ class StreamWriter(Writer):
             vless["clients"][0]["id"] = str(uuid.uuid4())
             if self.stream_type in (StreamType.VLESS_TLS, StreamType.VLESS_REALITY):
                 vless["clients"][0]["flow"] = kw["flow"]
-            if self.stream_type in (StreamType.VLESS_WS, StreamType.VLESS_REALITY):
+            # Reality gRPC / Reality TCP / VLESS_WS 都不需要 fallbacks
+            if self.stream_type in (StreamType.VLESS_WS, StreamType.VLESS_REALITY, StreamType.VLESS_REALITY_GRPC):
                 del vless["fallbacks"]
             self.part_json['protocol'] = "vless"
             self.part_json["settings"] = vless
@@ -276,8 +280,29 @@ class StreamWriter(Writer):
                     self.part_json["streamSettings"]["security"] = "reality"
                     if "tlsSettings" in self.part_json["streamSettings"]:
                         del self.part_json["streamSettings"]["tlsSettings"]
+                elif self.stream_type == StreamType.VLESS_REALITY_GRPC:
+                    # gRPC 传输层配置
+                    alpn = ["h2"]
+                    self.part_json["streamSettings"]["network"] = "grpc"
+                    service_name = kw.get('serviceName', 'grpc')
+                    self.part_json["streamSettings"]["grpcSettings"]["serviceName"] = service_name
+                    if "mode" in kw and kw["mode"] == "multi":
+                        self.part_json["streamSettings"]["grpcSettings"]["multiMode"] = True
+                    # Reality 安全层配置
+                    short_id = ''.join(random.sample('0123456789abcdef', 16))
+                    reality_settings = self.load_template('reality.json')
+                    reality_settings["serverNames"] = kw['serverNames']
+                    reality_settings["dest"] = "{}:443".format(kw['serverNames'][0])
+                    reality_settings["privateKey"] = x25519_key()[0]
+                    reality_settings["shortIds"] = [short_id]
+                    self.part_json["streamSettings"]["realitySettings"] = reality_settings
+                    self.part_json["streamSettings"]["security"] = "reality"
+                    if "tlsSettings" in self.part_json["streamSettings"]:
+                        del self.part_json["streamSettings"]["tlsSettings"]
+                    if "fallbacks" in self.part_json["settings"]:
+                        del self.part_json["settings"]["fallbacks"]
             self.save()
-            # tls的设置
+            # tls的设置（Reality 类型不需要 TLS 证书）
             if self.stream_type in (StreamType.VLESS_WS, StreamType.VLESS_TLS, StreamType.VLESS_GRPC):
                 if not "certificates" in tls_settings_backup:
                     from ..config_modify.tls import TLSModifier
@@ -326,7 +351,9 @@ class StreamWriter(Writer):
                 tm.turn_on(False)
                 return
 
-        if self.stream_type not in no_tls_group and origin_protocol not in no_tls_group and self.stream_type != StreamType.VLESS_REALITY:
+        # Reality 类型自行管理安全设置，不需要从备份恢复
+        reality_group = (StreamType.VLESS_REALITY, StreamType.VLESS_REALITY_GRPC)
+        if self.stream_type not in no_tls_group and origin_protocol not in no_tls_group and self.stream_type not in reality_group:
             self.part_json["streamSettings"]["security"] = security_backup
             if security_backup == "reality":
                 self.part_json["streamSettings"]["realitySettings"] = tls_settings_backup
@@ -336,7 +363,7 @@ class StreamWriter(Writer):
         if domain and self.stream_type not in no_tls_group:
             self.part_json["domain"] = domain
 
-        apln_list = (StreamType.VLESS_TLS, StreamType.TROJAN, StreamType.VLESS_REALITY, StreamType.VLESS_GRPC)
+        apln_list = (StreamType.VLESS_TLS, StreamType.TROJAN, StreamType.VLESS_REALITY, StreamType.VLESS_GRPC, StreamType.VLESS_REALITY_GRPC)
         if self.stream_type not in apln_list and "streamSettings" in self.part_json and "tlsSettings" in self.part_json["streamSettings"] and "alpn" in self.part_json["streamSettings"]["tlsSettings"]:
             del self.part_json["streamSettings"]["tlsSettings"]["alpn"]
 
@@ -613,7 +640,9 @@ class NodeWriter(Writer):
             if "email" in kw and kw["email"] != "":
                 user.update({"email":kw["email"]})
                 info = ", email: " + kw["email"]
-            if self.part_json["streamSettings"]["security"] in ("reality", "tls"):
+            # gRPC 传输层不支持 xtls-rprx-vision flow，只有 reality+tcp 和 tls+tcp 需要
+            is_grpc = self.part_json["streamSettings"]["network"] == "grpc"
+            if self.part_json["streamSettings"]["security"] in ("reality", "tls") and not is_grpc:
                 user["flow"] = kw["flow"]
                 info += ", flow: " + kw["flow"]
             self.part_json["settings"]["clients"].append(user)

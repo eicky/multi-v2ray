@@ -85,7 +85,8 @@ def new_user():
                 if password == "":
                     password = random_pass
                 info['password'] = password
-            elif type(group.node_list[0]) == Vless and group.tls == "reality":
+            elif type(group.node_list[0]) == Vless and group.tls == "reality" and group.node_list[0].network != "grpc":
+                # 仅 Reality TCP 需要设置 flow，gRPC 传输层不支持 xtls-rprx-vision
                 info['flow'] = xtls_flow()[0]
             nw.create_new_user(**info)
             return True
