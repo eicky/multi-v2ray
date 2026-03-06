@@ -20,6 +20,15 @@ setup(
     license='GPL',
     packages=find_packages(),
     include_package_data=True,
+    package_data={
+        'v2ray_util': [
+            'locale_i18n/*/LC_MESSAGES/*.mo',
+            'json_template/*.json',
+            'global_setting/*.sh',
+            'util_core/util.dat',
+            'util_core/util.cfg',
+        ],
+    },
     zip_safe=False,
     python_requires='>=3',
     entry_points={
