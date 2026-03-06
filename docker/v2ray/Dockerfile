@@ -34,18 +34,21 @@ COPY run.sh /root
 
 WORKDIR /root
 
-RUN apk --no-cache add python3 py3-pip bash bash-completion ca-certificates curl socat openssl iptables ip6tables && \
-    rm -f /usr/lib/python*/EXTERNALLY-MANAGED && \
-    ln -sf $(which pip3) /usr/local/bin/pip && \
-    LATEST_VERSION=`curl -s $VERSION_LIST|grep name|grep -o "[0-9].*[0-9]"|head -n 1` && \
-    pip install v2ray-util==$LATEST_VERSION && \
-    curl $SOURCE_COMPLETION_FILE > $COMPLETION_FILE && \
-    mkdir /var/log/v2ray/ && \
-    chmod +x /usr/bin/v2ray/v2ray && \
-    chmod +x /root/run.sh && \
-    chmod +x $COMPLETION_FILE && \
-    echo "source $COMPLETION_FILE" > /root/.bashrc && \
-    ln -s $(which v2ray-util) /usr/local/bin/v2ray && \
-    rm -r /root/.cache
+RUN set -ex \
+    && apk --no-cache add python3 py3-pip bash bash-completion ca-certificates curl socat openssl iptables ip6tables \
+    && rm -f /usr/lib/python*/EXTERNALLY-MANAGED \
+    && ln -sf $(which pip3) /usr/local/bin/pip \
+    && LATEST_VERSION=$(curl -fsSL "$VERSION_LIST" | grep name | grep -o "[0-9].*[0-9]" | head -n 1) \
+    && echo "Installing v2ray-util version: ${LATEST_VERSION}" \
+    && [ -n "${LATEST_VERSION}" ] || { echo "Failed to fetch latest version from ${VERSION_LIST}"; exit 1; } \
+    && pip install v2ray-util==$LATEST_VERSION \
+    && curl $SOURCE_COMPLETION_FILE > $COMPLETION_FILE \
+    && mkdir -p /var/log/v2ray/ \
+    && chmod +x /usr/bin/v2ray/v2ray \
+    && chmod +x /root/run.sh \
+    && chmod +x $COMPLETION_FILE \
+    && echo "source $COMPLETION_FILE" > /root/.bashrc \
+    && ln -s $(which v2ray-util) /usr/local/bin/v2ray \
+    && rm -rf /root/.cache
 
 ENTRYPOINT ["./run.sh"]
