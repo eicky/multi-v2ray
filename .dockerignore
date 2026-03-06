@@ -1,0 +1,10 @@
+.git
+.github
+v2ray-agent
+__pycache__
+*.pyc
+*.pyo
+.eggs
+*.egg-info
+dist
+build

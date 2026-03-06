@@ -25,12 +25,14 @@ LABEL maintainer="Jrohy <euvkzx@Jrohy.com>"
 
 ENV COMPLETION_FILE="/usr/share/bash-completion/completions/v2ray"
 ENV SOURCE_COMPLETION_FILE="https://multi.netlify.app/v2ray"
-ENV VERSION_LIST="https://api.github.com/repos/eicky/multi-v2ray/tags"
 
 COPY --from=builder /usr/bin/xray/xray /usr/bin/xray/
 COPY --from=builder /usr/bin/xray/geoip.dat /usr/bin/xray/
 COPY --from=builder /usr/bin/xray/geosite.dat /usr/bin/xray/
-COPY run.sh /root
+COPY docker/xray/run.sh /root
+# 复制源码用于本地安装 v2ray-util，不依赖 PyPI
+COPY setup.py README.md README_EN.md /tmp/v2ray-util/
+COPY v2ray_util/ /tmp/v2ray-util/v2ray_util/
 
 WORKDIR /root
 
@@ -38,10 +40,8 @@ RUN set -ex \
     && apk --no-cache add python3 py3-pip bash bash-completion ca-certificates curl socat openssl iptables ip6tables \
     && rm -f /usr/lib/python*/EXTERNALLY-MANAGED \
     && ln -sf $(which pip3) /usr/local/bin/pip \
-    && LATEST_VERSION=$(curl -fsSL "$VERSION_LIST" | grep name | grep -o "[0-9].*[0-9]" | head -n 1) \
-    && echo "Installing v2ray-util version: ${LATEST_VERSION}" \
-    && [ -n "${LATEST_VERSION}" ] || { echo "Failed to fetch latest version from ${VERSION_LIST}"; exit 1; } \
-    && pip install v2ray-util==$LATEST_VERSION \
+    && pip install /tmp/v2ray-util/ \
+    && rm -rf /tmp/v2ray-util \
     && curl $SOURCE_COMPLETION_FILE > $COMPLETION_FILE \
     && mkdir -p /var/log/xray/ \
     && chmod +x /usr/bin/xray/xray \

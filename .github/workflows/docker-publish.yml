@@ -39,7 +39,7 @@ jobs:
       - name: Build & Push v2ray
         uses: docker/build-push-action@v6
         with:
-          context: ./docker/v2ray/
+          context: .
           file: ./docker/v2ray/Dockerfile
           push: true
           platforms: ${{ env.PLATFORMS }}
@@ -50,7 +50,7 @@ jobs:
       - name: Build & Push xray
         uses: docker/build-push-action@v6
         with:
-          context: ./docker/xray/
+          context: .
           file: ./docker/xray/Dockerfile
           push: true
           platforms: ${{ env.PLATFORMS }}
