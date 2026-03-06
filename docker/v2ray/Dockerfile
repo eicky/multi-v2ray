@@ -40,7 +40,7 @@ RUN set -ex \
     && apk --no-cache add python3 py3-pip bash bash-completion ca-certificates curl socat openssl iptables ip6tables \
     && rm -f /usr/lib/python*/EXTERNALLY-MANAGED \
     && ln -sf $(which pip3) /usr/local/bin/pip \
-    && pip install /tmp/v2ray-util/ \
+    && pip install --no-build-isolation /tmp/v2ray-util/ \
     && rm -rf /tmp/v2ray-util \
     && curl $SOURCE_COMPLETION_FILE > $COMPLETION_FILE \
     && mkdir -p /var/log/v2ray/ \
