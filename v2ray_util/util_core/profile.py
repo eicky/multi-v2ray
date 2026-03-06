@@ -126,10 +126,23 @@ class Profile:
                 host = conf_stream["tcpSettings"]["header"]["request"]["headers"]["Host"]
                 header = "http"
 
-            if conf_stream["network"] == "kcp" and "header" in conf_stream["kcpSettings"]:
-                header = conf_stream["kcpSettings"]["header"]["type"]
-                if "seed" in conf_stream["kcpSettings"]:
-                    path = conf_stream["kcpSettings"]["seed"]
+            if conf_stream["network"] == "kcp":
+                # 兼容新旧两种 mKCP 配置格式
+                if "finalmask" in conf_stream and "udp" in conf_stream["finalmask"]:
+                    # Xray 26.x 新格式：从 finalmask.udp 数组中提取 header 和 seed
+                    for item in conf_stream["finalmask"]["udp"]:
+                        fm_type = item.get("type", "")
+                        if fm_type.startswith("header-"):
+                            # header-srtp → srtp, header-wechat → wechat-video
+                            raw = fm_type[len("header-"):]
+                            header = "wechat-video" if raw == "wechat" else raw
+                        elif fm_type == "mkcp-aes128gcm":
+                            path = item.get("settings", {}).get("password", "")
+                elif "kcpSettings" in conf_stream and "header" in conf_stream["kcpSettings"]:
+                    # v2ray 旧格式：kcpSettings.header.type + seed
+                    header = conf_stream["kcpSettings"]["header"]["type"]
+                    if "seed" in conf_stream["kcpSettings"]:
+                        path = conf_stream["kcpSettings"]["seed"]
             
             if conf_stream["network"] == "quic" and conf_stream["quicSettings"]:
                 quic_settings = conf_stream["quicSettings"]

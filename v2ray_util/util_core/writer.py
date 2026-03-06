@@ -5,9 +5,20 @@ import random
 import string
 import uuid
 
+from v2ray_util import run_type
 from .config import Config
 from .utils import StreamType, random_port, x25519_key
 from .group import Mtproto, Vmess, Socks, Vless, Trojan
+
+# Xray 26.x 将 mKCP header.type 迁移到 finalmask/udp，需要旧→新的映射
+_KCP_HEADER_TO_FINALMASK = {
+    "none": None,
+    "srtp": "header-srtp",
+    "utp": "header-utp",
+    "dtls": "header-dtls",
+    "wechat-video": "header-wechat",
+    "wireguard": "header-wireguard",
+}
 
 def clean_mtproto_tag(config, group_index):
     '''
@@ -122,7 +133,17 @@ class StreamWriter(Writer):
             type_str = "wechat-video"
         elif "wireguard" in header_type:
             type_str = "wireguard"
-        self.part_json["streamSettings"]["kcpSettings"]["header"]["type"] = type_str
+
+        if run_type == "xray":
+            # Xray 26.x 使用 finalmask/udp 替代旧的 kcpSettings.header
+            finalmask_type = _KCP_HEADER_TO_FINALMASK.get(type_str)
+            if finalmask_type:
+                self.part_json["streamSettings"]["finalmask"] = {
+                    "udp": [{"type": finalmask_type}]
+                }
+        else:
+            # v2ray 仍使用旧格式 kcpSettings.header
+            self.part_json["streamSettings"]["kcpSettings"]["header"] = {"type": type_str}
 
     def write(self, **kw):
         security_backup, tls_settings_backup, origin_protocol, domain = "", "", None, ""
@@ -257,8 +278,18 @@ class StreamWriter(Writer):
                     ws["wsSettings"]["headers"]["Host"] = kw['host']
                 self.part_json["streamSettings"] = ws
             elif self.stream_type in (StreamType.VLESS_KCP, StreamType.VLESS_UTP, StreamType.VLESS_SRTP, StreamType.VLESS_DTLS, StreamType.VLESS_WECHAT, StreamType.VLESS_WG):
-                self.to_kcp(self.stream_type.value)  
-                self.part_json["streamSettings"]["kcpSettings"]["seed"] = ''.join(random.sample(string.ascii_letters + string.digits, 8))
+                self.to_kcp(self.stream_type.value)
+                seed = ''.join(random.sample(string.ascii_letters + string.digits, 8))
+                if run_type == "xray":
+                    # Xray 26.x: seed 迁移到 finalmask/udp 的 mkcp-aes128gcm
+                    finalmask = self.part_json["streamSettings"].get("finalmask", {"udp": []})
+                    finalmask["udp"].append({
+                        "type": "mkcp-aes128gcm",
+                        "settings": {"password": seed}
+                    })
+                    self.part_json["streamSettings"]["finalmask"] = finalmask
+                else:
+                    self.part_json["streamSettings"]["kcpSettings"]["seed"] = seed
             else:
                 self.part_json["streamSettings"] = self.load_template('tcp.json')
                 if self.stream_type == StreamType.VLESS_GRPC:
@@ -432,6 +463,9 @@ class GroupWriter(Writer):
                 print("")
                 print(_("already reset protocol to origin kcp"))
                 self.part_json["streamSettings"] = self.load_template('kcp.json')
+                if run_type != "xray":
+                    # v2ray 需要旧格式的 header 字段
+                    self.part_json["streamSettings"]["kcpSettings"]["header"] = {"type": "none"}
             else:
                 self.part_json["streamSettings"]["security"] = "none"
                 self.part_json["streamSettings"]["tlsSettings"] = {}
