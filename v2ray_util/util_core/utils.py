@@ -271,9 +271,13 @@ def x25519_key(private_key=None):
         return result
 
     # xray 命令不可用（v26.x 移除了 x25519 子命令），回退到 Python 实现
-    import base64
-    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
-    from cryptography.hazmat.primitives import serialization
+    try:
+        import base64
+        from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+        from cryptography.hazmat.primitives import serialization
+    except ImportError:
+        print(ColorStr.red("错误: cryptography 库未安装，当前架构可能不支持。请安装: pip install cryptography"))
+        return []
 
     if private_key:
         # 从已有私钥派生公钥（Xray 使用 base64 RawURLEncoding = URL-safe 无 padding）

@@ -29,9 +29,10 @@ setup(
             'util_core/util.cfg',
         ],
     },
-    install_requires=[
-        'cryptography',
-    ],
+    install_requires=[],
+    extras_require={
+        'crypto': ['cryptography'],
+    },
     zip_safe=False,
     python_requires='>=3',
     entry_points={
