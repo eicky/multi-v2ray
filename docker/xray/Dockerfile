@@ -24,12 +24,13 @@ FROM alpine:latest
 LABEL maintainer="Jrohy <euvkzx@Jrohy.com>"
 
 ENV COMPLETION_FILE="/usr/share/bash-completion/completions/v2ray"
-ENV SOURCE_COMPLETION_FILE="https://multi.netlify.app/v2ray"
 
 COPY --from=builder /usr/bin/xray/xray /usr/bin/xray/
 COPY --from=builder /usr/bin/xray/geoip.dat /usr/bin/xray/
 COPY --from=builder /usr/bin/xray/geosite.dat /usr/bin/xray/
 COPY docker/xray/run.sh /root
+# bash 自动补全文件，直接从仓库复制，不再依赖外部网络下载
+COPY multi.netlify.app/v2ray /usr/share/bash-completion/completions/v2ray
 # 复制源码用于本地安装 v2ray-util，不依赖 PyPI
 COPY setup.py README.md README_EN.md /tmp/v2ray-util/
 COPY v2ray_util/ /tmp/v2ray-util/v2ray_util/
@@ -43,7 +44,6 @@ RUN set -ex \
     && pip install --only-binary=:all: cryptography 2>/dev/null || true \
     && pip install --no-build-isolation /tmp/v2ray-util/ \
     && rm -rf /tmp/v2ray-util \
-    && curl $SOURCE_COMPLETION_FILE > $COMPLETION_FILE \
     && mkdir -p /var/log/xray/ \
     && chmod +x /usr/bin/xray/xray \
     && chmod +x /root/run.sh \
