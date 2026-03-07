@@ -29,6 +29,9 @@ setup(
             'util_core/util.cfg',
         ],
     },
+    install_requires=[
+        'cryptography',
+    ],
     zip_safe=False,
     python_requires='>=3',
     entry_points={

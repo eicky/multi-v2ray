@@ -257,11 +257,45 @@ def clean_iptables(port):
         os.system(clean_cmd.format(iptable_way, "OUTPUT", str(line)))
 
 def x25519_key(private_key=None):
-    gen_cmd="/usr/bin/xray/xray x25519"
+    """
+    生成或派生 X25519 密钥对，返回 [private_key_b64, public_key_b64]
+    优先使用 xray 命令行工具，失败时回退到 Python cryptography 库
+    """
+    # 先尝试 xray 命令行工具
+    gen_cmd = "/usr/bin/xray/xray x25519"
     if private_key:
         gen_cmd = "{} -i '{}'".format(gen_cmd, private_key)
-    gen_result = os.popen(gen_cmd + "|awk -F ':' '{print $2}'|sed 's/ //g'").readlines()
-    return list(map(lambda x: x.strip(), gen_result))
+    gen_result = os.popen(gen_cmd + " 2>/dev/null | awk -F ':' '{print $2}' | sed 's/ //g'").readlines()
+    result = [x.strip() for x in gen_result if x.strip()]
+    if len(result) >= 2:
+        return result
+
+    # xray 命令不可用（v26.x 移除了 x25519 子命令），回退到 Python 实现
+    import base64
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
+
+    if private_key:
+        # 从已有私钥派生公钥（Xray 使用 base64 RawURLEncoding = URL-safe 无 padding）
+        padded = private_key + '=' * (-len(private_key) % 4)
+        raw_private = base64.urlsafe_b64decode(padded)
+        pk = X25519PrivateKey.from_private_bytes(raw_private)
+    else:
+        pk = X25519PrivateKey.generate()
+
+    raw_priv = pk.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    raw_pub = pk.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw
+    )
+    # 与 Xray Go 端 base64.RawURLEncoding 格式一致
+    priv_b64 = base64.urlsafe_b64encode(raw_priv).rstrip(b'=').decode()
+    pub_b64 = base64.urlsafe_b64encode(raw_pub).rstrip(b'=').decode()
+    return [priv_b64, pub_b64]
 
 def all_port():
     from .loader import Loader

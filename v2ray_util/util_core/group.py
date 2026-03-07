@@ -150,6 +150,9 @@ Network: {network}
             # gRPC 传输层不支持 xtls-rprx-vision flow，仅 tcp 需要
             if self.flow:
                 result_link += "&flow={}".format(self.flow)
+        else:
+            # 显式声明 security=none，否则部分客户端会默认当 TLS 开启处理
+            result_link += "&security=none"
         if self.network == "ws":
             result_link += "&type=ws&host={0}&path={1}".format(self.host, quote(self.path))
         elif self.network == "tcp":
